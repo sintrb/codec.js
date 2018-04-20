@@ -1,7 +1,7 @@
 # codec.js
 ASCII/GBK/UTF-8 encode or decode with Javascript.
 
-Javascript实现的ASCII/GBK/UTF-8编码和解码封装。
+Javascript实现的ASCII/GBK/UTF-8编码和解码封装，支持浏览器端和微信小程序。
 
 例子:
 ```js
