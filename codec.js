@@ -5,7 +5,29 @@
 **  ==========================================================================
 **/
 
-let gbk = function () {
+function splitToInts(code) {
+    const bytes = [];
+    for (var i = 0; i < code.length; i++) {
+        const c = code.charAt(i);
+        if (c === '%') {
+            const hex = code.charAt(i + 1) + code.charAt(i + 2);
+            const hexVal = parseInt(hex, 16);
+            bytes.push(hexVal);
+            i += 2;
+        } else bytes.push(c.charCodeAt(0));
+    }
+    return bytes;
+}
+
+function safeMap(arr, func) {
+    var rarr = new Array(arr.length);
+    for (var i = 0; i < arr.length; ++i) {
+        rarr[i] = func(arr[i]);
+    }
+    return rarr;
+}
+
+var gbk = function () {
     // gbk source code：zjfeihu@126.com
     var data = function (zipData) {
         var re = zipData
@@ -75,36 +97,54 @@ let gbk = function () {
 }();
 
 
-
-function splitToInts(code) {
-    const bytes = [];
-    for (var i = 0; i < code.length; i++) {
-        const c = code.charAt(i);
-        if (c === '%') {
-            const hex = code.charAt(i + 1) + code.charAt(i + 2);
-            const hexVal = parseInt(hex, 16);
-            bytes.push(hexVal);
-            i += 2;
-        } else bytes.push(c.charCodeAt(0));
+var code128 = function(){
+    var codesa = [" ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/","0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?","@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","NUL","SOH","STX","ETX","EOT","ENQ","ACK","BEL","BS","HT","LF","VT","FF","CR","SO","SI","DLE","DC1","DC2","DC3","DC4","NAK","SYN","ETB","CAN","EM","SUB","ESC","FS","GS","RS","US","FNC3","FNC2","SHIFT","CODEC","CODEB","FNC4","FNC1","StartA","StartB","StartC","Stop"];
+    var codesb = [" ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/","0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?","@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","`","a","b","c","d","e","f","g","h","i","j","k","I","m","n","o","p","q","r","s","t","u","v","w","x","y","z","{","|","}","~","DEL","FNC3","FNC2","SHIFT","CODEC","FNC4","CODEA","FNC1","StartA","StartB","StartC","Stop"];
+    var codesc = ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59","60","61","62","63","64","65","66","67","68","69","70","71","72","73","74","75","76","77","78","79","80","81","82","83","84","85","86","87","88","89","90","91","92","93","94","95","96","97","98","99","CODEB","CODEA","FNC1","StartA","StartB","StartC","Stop"];
+    function genCodec(codes){
+        var sorts = codes.map(function(s, i){
+            var r = String.fromCharCode(0xff00 | i);
+            return {s,i,r};
+        }).sort(function(a,b){
+            return a.s.length - b.s.length;
+        });
+        return {
+            encode: function(text){
+                text = text.replace(/[\u00FF-\uFFFF]/g, "");
+                for (var i = sorts.length - 1; i >= 0; i--) {
+                    var st = sorts[i];
+                    text = text.split(st.s).join(st.r);
+                }
+                var bytes = [];
+                for (var i=0; i<text.length; ++i){
+                    var code = text.charCodeAt(i);
+                    if(code > 0x00ff){
+                        bytes.push(code & 0x00ff);
+                    }
+                }
+                return bytes;
+            },
+            decode: function(bytes){
+                return safeMap(bytes, function(t){
+                    return t < codes.length? codes[t]: "?";
+                }).join("");
+            }
+        }
+    };
+    return {
+        a: genCodec(codesa),
+        b: genCodec(codesb),
+        c: genCodec(codesc),
     }
-    return bytes;
-}
+}();
 
-function safeMap(arr, func) {
-    let rarr = new Array(arr.length);
-    for (let i = 0; i < arr.length; ++i) {
-        rarr[i] = func(arr[i]);
-    }
-    return rarr;
-}
-
-let codec = {
+var codec = {
     gbk: {
         encode(text) {
             return splitToInts(gbk.encode(text))
         },
         decode(bytes) {
-            let chars = safeMap(bytes, t => {
+            var chars = safeMap(bytes, function(t){
                 return (t < 10 ? "%0" : "%") + t.toString(16).toUpperCase();
             }).join("");
             return gbk.decode(chars);
@@ -115,7 +155,7 @@ let codec = {
             return splitToInts(encodeURIComponent(text))
         },
         decode(bytes) {
-            let chars = safeMap(bytes, t => {
+            var chars = safeMap(bytes, function(t){
                 return (t < 10 ? "%0" : "%") + t.toString(16).toUpperCase();
             }).join("");
             return decodeURIComponent(chars);
@@ -123,30 +163,55 @@ let codec = {
     },
     ascii: {
         encode(text) {
-            let bytes = [];
-            for (let i = 0; i < text.length; ++i) {
+            var bytes = [];
+            for (var i = 0; i < text.length; ++i) {
                 bytes.push(text.charCodeAt(i) & 0x00ff);
             }
             return bytes;
         },
         decode(bytes) {
-            let chars = [];
-            for (let i = 0; i < bytes.length; ++i) {
+            var chars = [];
+            for (var i = 0; i < bytes.length; ++i) {
                 chars.push(String.fromCharCode(bytes[i]));
             }
             return chars.join("");
         }
-    }
+    },
+    code128a: {
+        encode(text) {
+            return code128.a.encode(text);
+        },
+        decode(bytes) {
+            return code128.a.decode(bytes);
+        }
+    },
+    code128b: {
+        encode(text) {
+            return code128.b.encode(text);
+        },
+        decode(bytes) {
+            return code128.b.decode(bytes);
+        }
+    },
+    code128c: {
+        encode(text) {
+            return code128.c.encode(text);
+        },
+        decode(bytes) {
+            return code128.c.decode(bytes);
+        }
+    },
 }
 
 
+
 function test() {
-    ['ABC123', 'Hello World', '你好 世界!', '这是一个测试文本👌'].map(text => {
+    ['ABC123', 'Hello World', '你好 世界!', '这是一个测试文本👌', 'StartA12541HI', '123456'].map(function(text){
         console.log("test for", text);
-        Object.keys(codec).map(k => {
-            let cd = codec[k];
-            let en = cd.encode(text);
-            let de = cd.decode(en);
+        Object.keys(codec).map(function(k){
+            var cd = codec[k];
+            var en = cd.encode(text);
+            var de = cd.decode(en);
             console.log("\t", k, text == de ? "ok" : "fail", de);
         });
     });
